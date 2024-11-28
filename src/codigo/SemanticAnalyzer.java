@@ -41,18 +41,53 @@ public class SemanticAnalyzer {
         return hasError;
     }
     
-    public void checkUndefinedVariable(String identifier, String scope, int line) {
-        if (!tablaSimbolos.existeVariable(identifier, scope)) {
-            addError(String.format("Variable '%s' no está definida en el ámbito actual", identifier), line);
+        public void checkFunctionDeclaration(Funcion funcion) {
+        // Verifica si ya existe una función con el mismo nombre
+        if (tablaSimbolos.existeFuncion(funcion.getIdentificador())) {
+            addError(String.format("Función '%s' ya está definida", 
+                    funcion.getIdentificador()), funcion.getFila());
+            return;
+        }
+
+        // Verifica parámetros duplicados
+        Set<String> paramNames = new HashSet<>();
+        for (Variable param : funcion.getParametros()) {
+            if (!paramNames.add(param.getIdentificador())) {
+                addError(String.format("Parámetro '%s' duplicado en la función '%s'", 
+                        param.getIdentificador(), funcion.getIdentificador()), 
+                        param.getFila());
+            }
+        }
+    }
+        
+    public void checkBreakStatement(int line) {
+        if (!tablaSimbolos.isInLoop()) {
+            addError("Sentencia 'break' fuera de un ciclo", line);
         }
     }
     
-    public void checkDoubleDefinition(Variable variable) {
-        if (tablaSimbolos.existeSimbolo(variable)) {
-            addError(String.format("Variable '%s' ya declarada en el ámbito '%s'", 
-                variable.getIdentificador(), variable.getAmbito()), variable.getFila());
+    public void checkVariableInFunction(Variable var, String functionName) {
+        // Verifica si la variable ya está definida en el ámbito de la función
+        if (tablaSimbolos.existeSimboloEnAmbito(var.getIdentificador(), functionName)) {
+            addError(String.format("Variable '%s' ya está definida en la función '%s'", 
+                    var.getIdentificador(), functionName), var.getFila());
         }
     }
+    
+    public void checkUndefinedVariable(String identifier, String scope, int line) {
+        Variable var = tablaSimbolos.buscarVariable(identifier, scope);
+        if (var == null) {
+            addError(String.format("Variable '%s' no está definida en el ámbito '%s'", 
+                    identifier, scope), line);
+        }
+    }
+    
+public void checkDoubleDefinition(Variable variable) {
+    if (tablaSimbolos.existeSimboloEnAmbito(variable.getIdentificador(), variable.getAmbito())) {
+        addError(String.format("Variable '%s' ya declarada en el ámbito '%s'", 
+            variable.getIdentificador(), variable.getAmbito()), variable.getFila());
+    }
+}
     
     public Expression foldConstants(Expression left, String operator, Expression right) {
         if (left.isConstant() && right.isConstant()) {
@@ -83,6 +118,14 @@ public class SemanticAnalyzer {
         return new Expression(TipoDato.INT);
     }
     
+    public Expression checkAndPropagateConstants(String identifier, String scope, int line) {
+    if (!tablaSimbolos.existeVariable(identifier, scope)) {
+        addError(String.format("Variable '%s' no definida en el ámbito actual", identifier), line);
+        return new Expression(TipoDato.INT); // Default to INT to prevent further propagation errors.
+    }
+    return propagateConstants(identifier, scope);
+    }
+
     public Expression propagateConstants(String identifier, String scope) {
         Expression constValue = constantValues.get(identifier);
         if (constValue != null && constValue.isConstant()) {
@@ -91,11 +134,11 @@ public class SemanticAnalyzer {
         return null;
     }
     
-    public void checkLoopControl(String statement, int line) {
-        if (!tablaSimbolos.isInLoop()) {
-            addError(String.format("'%s' solo puede usarse dentro de ciclos", statement), line);
-        }
+public void checkLoopControl(String statement, int line) {
+    if (!tablaSimbolos.isInLoop()) {
+        addError(String.format("'%s' solo puede usarse dentro de ciclos", statement), line);
     }
+}
     
     public void checkTypeCompatibility(TipoDato leftType, TipoDato rightType, String operator, int line) {
         if (leftType != rightType) {
@@ -104,10 +147,14 @@ public class SemanticAnalyzer {
         }
     }
     
-    private void addError(String message, int line) {
-        hasError = true;
+private void addError(String message, int line) {
+    hasError = true;
+    if (line > 0) {
         erroresSemanticos.add(String.format("Línea %d: Error semántico - %s", line, message));
+    } else {
+        erroresSemanticos.add(String.format("Error semántico - %s (línea desconocida)", message));
     }
+}
     
     public List<String> getErrores() {
         return erroresSemanticos;

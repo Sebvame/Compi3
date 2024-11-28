@@ -7,6 +7,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Stack;
 
 
@@ -36,6 +37,7 @@ public class TablaSimbolos {
     
     private Stack<Boolean> loopStack = new Stack<>();
     private Map<String, Expression> constantValues = new HashMap<>();
+    private Map<String, Stack<String>> ambitosAnidados = new HashMap<>();
 
     public TablaSimbolos()
     {
@@ -107,74 +109,58 @@ public class TablaSimbolos {
      * Inserta un símbolo a la tabla de símbolos xD
      * @param simbolo Simbolo a insertar (Variable o Función)
      */
-    public void insertar(Simbolo simbolo) {
-    if (simbolo != null) {
-        System.out.println("Insertando símbolo en tabla: " + simbolo.getIdentificador());
-        if (simbolo instanceof Variable) {
-            Variable var = (Variable) simbolo;
-            System.out.println("Variable: " + var.getIdentificador() + 
-                             ", tipo: " + var.getTipo() + 
-                             ", ámbito: " + var.getAmbito());
+public void insertar(Simbolo simbolo) {
+        if (simbolo != null) {
+            System.out.println("Insertando símbolo: " + simbolo.getIdentificador() + 
+                             " en ámbito: " + simbolo.getAmbito());
+            tablaSimbolos.add(simbolo);
         }
-        tablaSimbolos.add(simbolo);
     }
-}
-
     /**
      * Revisa si ya existe un símbolo en la tabla de símbolos.
      * @param simbolo Variable o Función
      * @return True existe, False no existe
      */
-    public boolean existeSimbolo(Simbolo simbolo){
-        Simbolo auxSimbolo;
-
-        if(simbolo instanceof Variable){
-            Variable aux = (Variable) simbolo;
-
-            for(int i=0; i<tablaSimbolos.size(); i++){
-                auxSimbolo = tablaSimbolos.get(i);
-                if(auxSimbolo instanceof Variable){
-                    if(auxSimbolo.identificador.equals(aux.identificador) &&
-                        auxSimbolo.ambito.equals(aux.ambito))
-                        return true;
-                }
-            }
-            return false;
+    public boolean existeSimbolo(Simbolo simbolo) {
+        if (simbolo instanceof Variable) {
+            Variable var = (Variable) simbolo;
+            return tablaSimbolos.stream()
+                .filter(s -> s instanceof Variable)
+                .anyMatch(s -> s.getIdentificador().equals(var.getIdentificador()) &&
+                             s.getAmbito().equals(var.getAmbito()));
+        } else if (simbolo instanceof Funcion) {
+            Funcion func = (Funcion) simbolo;
+            return tablaSimbolos.stream()
+                .filter(s -> s instanceof Funcion)
+                .anyMatch(s -> s.getIdentificador().equals(func.getIdentificador()));
         }
-        else if(simbolo instanceof Funcion){
-            Funcion funcion = (Funcion) simbolo;
-            Funcion aux;
-            int cantidadIguales;
+        return false;
+    }
 
-            for(int i=0; i<tablaSimbolos.size(); i++){
-                auxSimbolo = tablaSimbolos.get(i);
-                if(auxSimbolo instanceof Funcion){
-                    aux = (Funcion)auxSimbolo;
-                    cantidadIguales = 0;
+    
+public boolean existeSimboloEnAmbito(String identificador, String ambitoActual) {
+        // Buscar en el ámbito actual
+        boolean existeEnAmbito = tablaSimbolos.stream()
+            .filter(s -> s instanceof Variable)
+            .anyMatch(s -> s.getIdentificador().equals(identificador) && 
+                         s.getAmbito().equals(ambitoActual));
 
-                    if(aux.identificador.equals(funcion.identificador) &&
-                            aux.getParametros().size() == funcion.getParametros().size()){
-
-                        for(int j=0; j<funcion.getParametros().size(); j++){
-                            Variable varAux = aux.getParametros().get(j);
-                            Variable varFuncion = funcion.getParametros().get(j);
-
-                            //si en algún momento difieren los parámetros
-                            if(varAux.getTipo() != varFuncion.getTipo()){
-                                break;
-                            }
-                            cantidadIguales++;
-                        }
-                        //si llega aquí significa que sí tienen los parámetros iguales
-                        if(cantidadIguales == funcion.getParametros().size())
-                            return true;
-                    }
-                }
-            }
-
-            return false;
+        // Si no está en el ámbito actual y no es el ámbito global,
+        // buscar en el ámbito global
+        if (!existeEnAmbito && !ambitoActual.equals("Global")) {
+            return tablaSimbolos.stream()
+                .filter(s -> s instanceof Variable)
+                .anyMatch(s -> s.getIdentificador().equals(identificador) && 
+                             s.getAmbito().equals("Global"));
         }
-        return false; //en realidad nunca va a llegar aquí pero yolo
+
+        return existeEnAmbito;
+    }
+
+public boolean existeFuncion(String identificador) {
+        return tablaSimbolos.stream()
+            .filter(s -> s instanceof Funcion)
+            .anyMatch(s -> s.getIdentificador().equals(identificador));
     }
 
     /**
@@ -295,6 +281,32 @@ public class TablaSimbolos {
         variablesSinTipo.add(var);
     }
 
+    public Variable buscarVariable(String identificador, String ambito) {
+        // Primero busca en el ámbito actual
+        for (Simbolo s : tablaSimbolos) {
+            if (s instanceof Variable) {
+                Variable var = (Variable) s;
+                if (var.getIdentificador().equals(identificador) && 
+                    var.getAmbito().equals(ambito)) {
+                    return var;
+                }
+            }
+        }        
+        // Si no está en el ámbito actual, busca en el ámbito global
+        if (!ambito.equals("Global")) {
+            for (Simbolo s : tablaSimbolos) {
+                if (s instanceof Variable) {
+                    Variable var = (Variable) s;
+                    if (var.getIdentificador().equals(identificador) && 
+                        var.getAmbito().equals("Global")) {
+                        return var;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
     /**
      * Retorna una variable existente dentro de la tabla de símbolos
      * @param nombreVariable Identificador de la variable
@@ -448,6 +460,32 @@ public class TablaSimbolos {
         return false;
     }
 
+    public void validarFuncion(String identificador, ArrayList<Variable> parametros, int linea) {
+        Optional<Simbolo> funcionOpt = tablaSimbolos.stream()
+            .filter(s -> s instanceof Funcion && 
+                        s.getIdentificador().equals(identificador))
+            .findFirst();
+        
+        if (!funcionOpt.isPresent()) {
+            throw new RuntimeException("Error en línea " + linea + 
+                ": Función '" + identificador + "' no declarada");
+        }
+        
+        Funcion funcion = (Funcion) funcionOpt.get();
+        if (funcion.getParametros().size() != parametros.size()) {
+            throw new RuntimeException("Error en línea " + linea + 
+                ": Número incorrecto de parámetros para función '" + identificador + "'");
+        }
+        
+        // Validar tipos de parámetros
+        for (int i = 0; i < parametros.size(); i++) {
+            if (funcion.getParametros().get(i).getTipo() != parametros.get(i).getTipo()) {
+                throw new RuntimeException("Error en línea " + linea + 
+                    ": Tipo incompatible en parámetro " + (i+1) + 
+                    " de función '" + identificador + "'");
+            }
+        }
+    }
     /**
      * Limpia la lista de parámetros que llaman a una función
      */
@@ -495,36 +533,38 @@ public class TablaSimbolos {
      * Define un string con toda la información existente en la tabla de símbolos
      * @return String con la información de todos los símbolos
      */
-    public String verTablaSimbolos(){
-        String msj = "";
-
-        for(Simbolo s : tablaSimbolos){
-            if(s instanceof Variable){
-                if(s.ambito== "Global"){
-                    msj += "Variable: " + s.identificador + ", tipo: " + ((Variable) s).getTipo() + ", ambito: "  + s.ambito + "\n";
-                }else {
-                    msj += "Variable: " + s.identificador + ", tipo: " + ((Variable) s).getTipo() + ", ambito: Local " + "\n";
-                }
-            }
-            else if(s instanceof Funcion){
-                if(((Funcion) s).getTipoRetorno() == null)  //Es procedimiento
-                    msj += "Procedimiento: " + s.identificador + "\n";
-                else                                        //Es funcion
-                    msj += "Función: " + s.identificador + ", tipo de retorno: " + ((Funcion) s).getTipoRetorno()  + "\n";
-
-                ArrayList<Variable> params = ((Funcion) s).getParametros();
-                msj += "\tCantidad de parámetros: " + params.size() + "\n";
-                if(params.size() != 0){
-                    msj += "\tParámetros: ";
-                    for(Variable v : params){
-                        msj += v.identificador + ": " + v.getTipo() + ", ";
-                    }
-                    msj = msj.substring(0, msj.length()-2) + ".\n";
+    public String verTablaSimbolos() {
+    StringBuilder msj = new StringBuilder();
+    
+    msj.append("=== Variables Globales ===\n");
+    for (Simbolo s : tablaSimbolos) {
+        if (s instanceof Variable && s.getAmbito().equals("Global")) {
+            Variable var = (Variable) s;
+            msj.append(String.format("Variable: %s, tipo: %s, ambito: Global\n",
+                var.getIdentificador(), var.getTipo()));
+        }
+    }
+    
+    msj.append("\n=== Funciones y Variables Locales ===\n");
+    for (Simbolo s : tablaSimbolos) {
+        if (s instanceof Funcion) {
+            Funcion func = (Funcion) s;
+            msj.append(String.format("\nFunción: %s, tipo retorno: %s\n",
+                func.getIdentificador(), func.getTipoRetorno()));
+            
+            // Imprimir variables locales de la función
+            for (Simbolo local : tablaSimbolos) {
+                if (local instanceof Variable && 
+                    local.getAmbito().equals(func.getIdentificador())) {
+                    Variable var = (Variable) local;
+                    msj.append(String.format("  Variable local: %s, tipo: %s\n",
+                        var.getIdentificador(), var.getTipo()));
                 }
             }
         }
-
-        return msj;
     }
+    
+    return msj.toString();
+}
 
 }

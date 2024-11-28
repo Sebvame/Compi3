@@ -11,20 +11,20 @@ public class sym {
   public static final int DIVIDE = 7;
   public static final int GTEQ = 15;
   public static final int SHORT = 34;
-  public static final int CONST = 50;
+  public static final int CONST = 51;
   public static final int CHAR = 32;
   public static final int LTEQ = 17;
   public static final int EQUALS = 14;
-  public static final int UMINUS = 51;
+  public static final int UMINUS = 52;
   public static final int PLUS_ASSIGN = 10;
   public static final int MINUS_MINUS = 3;
-  public static final int CASE = 46;
-  public static final int CONTINUE = 43;
+  public static final int CASE = 47;
+  public static final int CONTINUE = 44;
   public static final int LPAREN = 23;
   public static final int INT = 30;
-  public static final int FOR = 41;
+  public static final int FOR = 42;
   public static final int MINUS = 5;
-  public static final int WRITE = 49;
+  public static final int WRITE = 50;
   public static final int RPAREN = 24;
   public static final int NOT = 22;
   public static final int SEMICOLON = 25;
@@ -33,33 +33,34 @@ public class sym {
   public static final int OR = 20;
   public static final int COMMA = 28;
   public static final int PLUS = 4;
-  public static final int IF = 37;
+  public static final int IF = 38;
+  public static final int MAIN = 35;
   public static final int ASSIGN = 9;
   public static final int EOF = 0;
-  public static final int RETURN = 44;
+  public static final int RETURN = 45;
   public static final int PLUS_PLUS = 2;
   public static final int error = 1;
-  public static final int NUMBER = 36;
+  public static final int NUMBER = 37;
   public static final int MOD = 8;
-  public static final int BREAK = 42;
+  public static final int BREAK = 43;
   public static final int VOID = 31;
-  public static final int SWITCH = 45;
+  public static final int SWITCH = 46;
   public static final int TIMES = 6;
   public static final int COLON = 29;
-  public static final int ELSE = 38;
+  public static final int ELSE = 39;
   public static final int TIMES_ASSIGN = 12;
   public static final int LBRACE = 26;
-  public static final int READ = 48;
-  public static final int WHILE = 39;
+  public static final int READ = 49;
+  public static final int WHILE = 40;
   public static final int DIVIDE_ASSIGN = 13;
-  public static final int DEFAULT = 47;
+  public static final int DEFAULT = 48;
   public static final int NOT_EQUALS = 19;
   public static final int RBRACE = 27;
   public static final int LONG = 33;
   public static final int GT = 16;
   public static final int MINUS_ASSIGN = 11;
-  public static final int DO = 40;
-  public static final int IDENTIFIER = 35;
+  public static final int DO = 41;
+  public static final int IDENTIFIER = 36;
   public static final String[] terminalNames = new String[] {
   "EOF",
   "error",
@@ -96,6 +97,7 @@ public class sym {
   "CHAR",
   "LONG",
   "SHORT",
+  "MAIN",
   "IDENTIFIER",
   "NUMBER",
   "IF",
