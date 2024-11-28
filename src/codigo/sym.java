@@ -18,16 +18,16 @@ public class sym {
   public static final int UMINUS = 51;
   public static final int PLUS_ASSIGN = 10;
   public static final int MINUS_MINUS = 3;
-  public static final int CASE = 45;
+  public static final int CASE = 46;
   public static final int CONTINUE = 43;
   public static final int LPAREN = 23;
   public static final int INT = 30;
   public static final int FOR = 41;
   public static final int MINUS = 5;
-  public static final int WRITE = 48;
+  public static final int WRITE = 49;
   public static final int RPAREN = 24;
   public static final int NOT = 22;
-  public static final int SEMICOLON = 27;
+  public static final int SEMICOLON = 25;
   public static final int AND = 21;
   public static final int LT = 18;
   public static final int OR = 20;
@@ -36,25 +36,25 @@ public class sym {
   public static final int IF = 37;
   public static final int ASSIGN = 9;
   public static final int EOF = 0;
-  public static final int RETURN = 49;
+  public static final int RETURN = 44;
   public static final int PLUS_PLUS = 2;
   public static final int error = 1;
   public static final int NUMBER = 36;
   public static final int MOD = 8;
   public static final int BREAK = 42;
   public static final int VOID = 31;
-  public static final int SWITCH = 44;
+  public static final int SWITCH = 45;
   public static final int TIMES = 6;
   public static final int COLON = 29;
   public static final int ELSE = 38;
   public static final int TIMES_ASSIGN = 12;
-  public static final int LBRACE = 25;
-  public static final int READ = 47;
+  public static final int LBRACE = 26;
+  public static final int READ = 48;
   public static final int WHILE = 39;
   public static final int DIVIDE_ASSIGN = 13;
-  public static final int DEFAULT = 46;
+  public static final int DEFAULT = 47;
   public static final int NOT_EQUALS = 19;
-  public static final int RBRACE = 26;
+  public static final int RBRACE = 27;
   public static final int LONG = 33;
   public static final int GT = 16;
   public static final int MINUS_ASSIGN = 11;
@@ -86,9 +86,9 @@ public class sym {
   "NOT",
   "LPAREN",
   "RPAREN",
+  "SEMICOLON",
   "LBRACE",
   "RBRACE",
-  "SEMICOLON",
   "COMMA",
   "COLON",
   "INT",
@@ -105,12 +105,12 @@ public class sym {
   "FOR",
   "BREAK",
   "CONTINUE",
+  "RETURN",
   "SWITCH",
   "CASE",
   "DEFAULT",
   "READ",
   "WRITE",
-  "RETURN",
   "CONST",
   "UMINUS"
   };

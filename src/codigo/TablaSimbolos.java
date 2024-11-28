@@ -107,10 +107,18 @@ public class TablaSimbolos {
      * Inserta un símbolo a la tabla de símbolos xD
      * @param simbolo Simbolo a insertar (Variable o Función)
      */
-    public void insertar(Simbolo simbolo)
-    {
+    public void insertar(Simbolo simbolo) {
+    if (simbolo != null) {
+        System.out.println("Insertando símbolo en tabla: " + simbolo.getIdentificador());
+        if (simbolo instanceof Variable) {
+            Variable var = (Variable) simbolo;
+            System.out.println("Variable: " + var.getIdentificador() + 
+                             ", tipo: " + var.getTipo() + 
+                             ", ámbito: " + var.getAmbito());
+        }
         tablaSimbolos.add(simbolo);
     }
+}
 
     /**
      * Revisa si ya existe un símbolo en la tabla de símbolos.

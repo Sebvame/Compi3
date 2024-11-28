@@ -26,9 +26,10 @@ public class Generador {
     private static String exitLabel = "";
     private static Deque<String> pilaEnd = new LinkedList<>();
     private static TablaSimbolos tablaSimbolos;
+    private static boolean inMain = false;
 
     public Generador(TablaSimbolos tablaSimbolos, String outputFile) {
-        this.tablaSimbolos = tablaSimbolos;
+        Generador.tablaSimbolos = tablaSimbolos;
         try {
             fileWriter = new FileWriter(outputFile);
             generarEncabezado();
@@ -51,9 +52,9 @@ public class Generador {
 
     public void generarVariablesGlobales() throws IOException {
         for (Simbolo simbolo : tablaSimbolos.getTablaSimbolos()) {
-            if (simbolo instanceof Variable && simbolo.getAmbito().equals("Global")) {
+            if (simbolo instanceof Variable) {
                 Variable var = (Variable) simbolo;
-                System.out.println("Generando variable global: " + var.getIdentificador()); // Debug
+                System.out.println("Generando variable: " + var.getIdentificador() + " en ámbito: " + var.getAmbito());
                 switch (var.getTipo()) {
                     case INT:
                         fileWriter.write(var.getIdentificador() + " dd 0\n");
@@ -65,13 +66,94 @@ public class Generador {
             }
         }
         fileWriter.write("\n.code\n");
+        fileWriter.write("start:\n");
+    }
+
+    public void procesarInstruccion(Instruccion instruccion) throws IOException {
+        System.out.println("Procesando instrucción: " + instruccion.getTipo() + 
+                         " (" + instruccion.getOperandoIzq() + " " + 
+                         instruccion.getOperador() + " " + 
+                         instruccion.getOperandoDer() + ")");
+                         
+        switch (instruccion.getTipo()) {
+            case DECLARACION:
+                // Las declaraciones ya se manejan en generarVariablesGlobales
+                break;
+                
+            case ASIGNACION:
+                if (instruccion.getOperador() != null && instruccion.getOperandoDer() != null) {
+                    generarAsignacionConOperacion(
+                        instruccion.getOperandoIzq(),
+                        instruccion.getOperador(),
+                        instruccion.getOperandoDer()
+                    );
+                } else {
+                    generarAsignacion(instruccion.getOperandoIzq(), instruccion.getOperandoDer());
+                }
+                break;
+
+            case OPERACION_ARITMETICA:
+                generarExpresionAritmetica(
+                    instruccion.getResultado(),
+                    instruccion.getOperandoIzq(),
+                    instruccion.getOperador(),
+                    instruccion.getOperandoDer()
+                );
+                break;
+
+            case IF:
+                generarIf(instruccion.getOperandoIzq(), 
+                         instruccion.getOperador(), 
+                         instruccion.getOperandoDer());
+                break;
+
+            case ELSE:
+                generarElse();
+                break;
+
+            case WHILE:
+                generarWhile(instruccion.getOperandoIzq(), 
+                           instruccion.getOperador(), 
+                           instruccion.getOperandoDer());
+                break;
+
+            case INCREMENTO:
+                generarIncremento(instruccion.getOperandoIzq());
+                break;
+
+            case DECREMENTO:
+                generarDecremento(instruccion.getOperandoIzq());
+                break;
+        }
+    }
+
+    private void generarAsignacionConOperacion(String destino, String operador, String valor) throws IOException {
+        fileWriter.write("    mov eax, " + destino + "\n");
+        switch (operador) {
+            case "+=":
+                fileWriter.write("    add eax, " + valor + "\n");
+                break;
+            case "-=":
+                fileWriter.write("    sub eax, " + valor + "\n");
+                break;
+            case "*=":
+                fileWriter.write("    imul eax, " + valor + "\n");
+                break;
+            case "/=":
+                fileWriter.write("    xor edx, edx\n");
+                fileWriter.write("    mov ebx, " + valor + "\n");
+                fileWriter.write("    idiv ebx\n");
+                break;
+        }
+        fileWriter.write("    mov " + destino + ", eax\n");
     }
 
     public void generarExpresionAritmetica(String resultado, String op1, String operador, String op2) throws IOException {
         Expression expr1 = tablaSimbolos.getConstantValue(op1);
         Expression expr2 = tablaSimbolos.getConstantValue(op2);
         
-        if (expr1 != null && expr2 != null) {
+        if (expr1 != null && expr2 != null && expr1.isConstant() && expr2.isConstant()) {
+            // Constant folding
             int val1 = (Integer) expr1.getValor();
             int val2 = (Integer) expr2.getValor();
             int resultadoConstante = 0;
@@ -88,6 +170,7 @@ public class Generador {
             fileWriter.write("    mov eax, " + resultadoConstante + "\n");
             fileWriter.write("    mov " + resultado + ", eax\n");
         } else {
+            // Generación normal
             fileWriter.write("    mov eax, " + op1 + "\n");
             switch (operador) {
                 case "+":
@@ -106,32 +189,6 @@ public class Generador {
                     break;
             }
             fileWriter.write("    mov " + resultado + ", eax\n");
-        }
-    }
-    
-    public void procesarInstruccion(Instruccion instruccion) throws IOException {
-        switch (instruccion.getTipo()) {
-            case ASIGNACION:
-                generarAsignacion(instruccion.getOperandoIzq(), instruccion.getOperador());
-                break;
-            case OPERACION_ARITMETICA:
-                generarExpresionAritmetica(instruccion.getResultado(), 
-                    instruccion.getOperandoIzq(), 
-                    instruccion.getOperador(), 
-                    instruccion.getOperandoDer());
-                break;
-            case IF:
-                generarIf(instruccion.getOperandoIzq(), instruccion.getOperador(), instruccion.getOperandoDer());
-                break;
-            case WHILE:
-                generarWhile(instruccion.getOperandoIzq(), instruccion.getOperador(), instruccion.getOperandoDer());
-                break;
-            case INCREMENTO:
-                generarIncremento(instruccion.getOperandoIzq());
-                break;
-            case DECREMENTO:
-                generarDecremento(instruccion.getOperandoIzq());
-                break;
         }
     }
 
@@ -156,10 +213,10 @@ public class Generador {
                 fileWriter.write("    jg " + etiquetaFalso + "\n");
                 break;
             case "==":
-                fileWriter.write("    je " + etiquetaFalso + "\n");
+                fileWriter.write("    jne " + etiquetaFalso + "\n");
                 break;
             case "!=":
-                fileWriter.write("    jne " + etiquetaFalso + "\n");
+                fileWriter.write("    je " + etiquetaFalso + "\n");
                 break;
         }
 
@@ -204,10 +261,10 @@ public class Generador {
                 fileWriter.write("    jg " + etiquetaFin + "\n");
                 break;
             case "==":
-                fileWriter.write("    je " + etiquetaFin + "\n");
+                fileWriter.write("    jne " + etiquetaFin + "\n");
                 break;
             case "!=":
-                fileWriter.write("    jne " + etiquetaFin + "\n");
+                fileWriter.write("    je " + etiquetaFin + "\n");
                 break;
         }
 
@@ -232,8 +289,10 @@ public class Generador {
     }
 
     public void generarAsignacion(String destino, String fuente) throws IOException {
+        if (fuente == null) return;
+        
         Expression exprFuente = tablaSimbolos.getConstantValue(fuente);
-        if (exprFuente != null) {
+        if (exprFuente != null && exprFuente.isConstant()) {
             fileWriter.write("    mov " + destino + ", " + exprFuente.getValor() + "\n");
         } else {
             fileWriter.write("    mov eax, " + fuente + "\n");
@@ -242,7 +301,8 @@ public class Generador {
     }
 
     public void cerrarArchivo() throws IOException {
-        fileWriter.write("\nend\n");
+        fileWriter.write("\n    invoke ExitProcess, 0\n");
+        fileWriter.write("end start\n");
         fileWriter.close();
     }
 

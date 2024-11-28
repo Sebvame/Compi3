@@ -11,7 +11,12 @@ includelib \masm32\lib\user32.lib
 .data
 x dd 0
 y dd 0
+a dd 0
+b dd 0
+c dd 0
 
 .code
+start:
 
-end
+    invoke ExitProcess, 0
+end start
