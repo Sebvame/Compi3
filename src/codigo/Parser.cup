@@ -1,0 +1,269 @@
+package codigo;
+import java_cup.runtime.*;
+import java.util.List;
+import java.util.ArrayList;
+import codigo.Traductor.Instruccion;
+import codigo.Traductor.TipoInstruccion;
+
+parser code {:
+    private java.util.List<String> syntaxErrors = new java.util.ArrayList<>();
+    private Symbol lastToken = null;
+    private List<String> erroresSemanticos = new ArrayList<>();
+    private SemanticAnalyzer semanticAnalyzer;
+    private TablaSimbolos tablaSimbolos;
+    private String ambitoActual = "Global";
+    private ArrayList<Instruccion> instrucciones = new ArrayList<>();
+
+    // Constructor del parser
+    public Parser(Lexer lexer) {
+        this(lexer);
+        init();
+    }
+
+    // Inicialización
+    private void init() {
+        tablaSimbolos = new TablaSimbolos();
+        semanticAnalyzer = new SemanticAnalyzer(tablaSimbolos);
+        erroresSemanticos = new ArrayList<>();
+        syntaxErrors = new ArrayList<>();
+        instrucciones = new ArrayList<>();
+        ambitoActual = "Global";
+    }
+
+    // Getters
+    public List<String> getSyntaxErrors() {
+        return syntaxErrors;
+    }
+    
+    public List<String> getSemanticErrors() {
+        return semanticAnalyzer != null ? semanticAnalyzer.getErrores() : new ArrayList<>();
+    }
+    
+    public TablaSimbolos getTablaSimbolos() {
+        return tablaSimbolos;
+    }
+    
+    public ArrayList<Instruccion> getInstrucciones() {
+        return instrucciones;
+    }
+
+    private void addError(int line, String message) {
+        String error = String.format("Línea %d: Error sintáctico - %s", line, message);
+        if (!syntaxErrors.contains(error)) {
+            syntaxErrors.add(error);
+        }
+    }
+
+    // Acciones de producción
+    private void handleDeclaration(String id, TipoDato t, int line, int column) {
+        if(semanticAnalyzer == null) {
+            init(); // Aseguramos que el analizador esté inicializado
+        }
+        Variable var = new Variable(id, t, ambitoActual, line, column);
+        semanticAnalyzer.checkDoubleDefinition(var);
+        if (!semanticAnalyzer.hasError()) {
+            tablaSimbolos.insertar(var);
+            addInstruccion(new Instruccion(TipoInstruccion.DECLARACION, id, null, null, null, line));
+        }
+    }
+
+    private void addInstruccion(Instruccion instruccion) {
+        if (instrucciones == null) {
+            instrucciones = new ArrayList<>();
+        }
+        instrucciones.add(instruccion);
+    }
+
+    public void syntax_error(Symbol s) {
+        if (s == null) return;
+        int line = s.left;
+        if (line <= 0) return; 
+        lastToken = s;
+    }
+
+    public void unrecovered_syntax_error(Symbol s) {
+        if (s != null && s.left > 0) {
+            addError(s.left, "Error irrecuperable en la estructura");
+        }
+    }
+:};
+
+/* Terminals */
+terminal            PLUS_PLUS, MINUS_MINUS;       // Operadores de incremento/decremento
+terminal            PLUS, MINUS, TIMES, DIVIDE, MOD;  // Operadores aritméticos
+terminal            ASSIGN, PLUS_ASSIGN, MINUS_ASSIGN, TIMES_ASSIGN, DIVIDE_ASSIGN;  // Asignaciones
+terminal            EQUALS, GTEQ, GT, LTEQ, LT, NOT_EQUALS;  // Operadores relacionales
+terminal            OR, AND, NOT;                 // Operadores lógicos
+terminal            LPAREN, RPAREN;               // Paréntesis
+terminal            LBRACE, RBRACE;               // Llaves
+terminal            SEMICOLON, COMMA, COLON;      // Puntuación
+terminal            INT, VOID, CHAR, LONG, SHORT; // Tipos de datos
+terminal String     IDENTIFIER;                   // Identificadores
+terminal Integer    NUMBER;                       // Números
+terminal            IF, ELSE;                     // Control de flujo if
+terminal            WHILE, DO, FOR;               // Bucles
+terminal            BREAK, CONTINUE;              // Control de bucle
+terminal            SWITCH, CASE, DEFAULT;        // Switch
+terminal            READ, WRITE;                  // I/O
+terminal            RETURN, CONST;                // Otros
+terminal            UMINUS;                       // Operador unario
+
+/* Non-terminals */
+non terminal            program;
+non terminal            statement_list;
+non terminal            statement;
+non terminal            declaration;
+non terminal Expression expr;
+non terminal Expression arithmetic_expr;
+non terminal Expression term;
+non terminal Expression primary_expr;
+non terminal Boolean    logical_expr;
+non terminal Boolean    rel_expr;
+non terminal TipoDato   type;
+non terminal            block;
+non terminal            if_statement;
+non terminal            while_statement;
+non terminal            do_while_statement;
+non terminal            for_statement;
+non terminal            switch_statement;
+non terminal            case_list;
+non terminal            case_statement;
+
+/* Precedences */
+precedence left     OR;
+precedence left     AND;
+precedence left     EQUALS, NOT_EQUALS;
+precedence left     LT, GT, LTEQ, GTEQ;
+precedence left     PLUS, MINUS;
+precedence left     TIMES, DIVIDE, MOD;
+precedence right    NOT, UMINUS;
+
+/* Grammar */
+start with program;
+
+program ::= statement_list;
+
+statement_list ::= 
+    statement_list statement
+    | statement;
+
+statement ::=
+    declaration:d SEMICOLON
+    | expr:e SEMICOLON
+    | if_statement:i 
+    | while_statement:w
+    | block:b
+    | BREAK SEMICOLON {: semanticAnalyzer.checkLoopControl("break", breakleft); :}
+    | CONTINUE SEMICOLON {: semanticAnalyzer.checkLoopControl("continue", continueleft); :}
+    | error SEMICOLON;
+
+declaration ::= type:t IDENTIFIER:id
+    {: 
+        handleDeclaration(id.toString(), t, idleft, idright);
+        // Mantenemos el RESULT que es necesario para la gramática
+        RESULT = instrucciones.get(instrucciones.size() - 1);
+    :};
+
+expr ::= 
+    IDENTIFIER:id ASSIGN expr:e
+    {:
+        semanticAnalyzer.checkUndefinedVariable(id, ambitoActual, idleft);
+        if (!semanticAnalyzer.hasError()) {
+            Variable var = tablaSimbolos.getVariable(id, ambitoActual);
+            semanticAnalyzer.checkTypeCompatibility(var.getTipo(), e.getTipo(), "=", idleft);
+            RESULT = e;
+            if (e.isConstant()) {
+                tablaSimbolos.registerConstant(id, e);
+            }
+        }
+    :}
+    | arithmetic_expr:a {: RESULT = a; :};
+
+arithmetic_expr ::= 
+    arithmetic_expr:a PLUS term:t   
+    {: RESULT = semanticAnalyzer.foldConstants(a, "+", t); :}
+    | arithmetic_expr:a MINUS term:t 
+    {: RESULT = semanticAnalyzer.foldConstants(a, "-", t); :}
+    | term:t                        
+    {: RESULT = t; :};
+
+term ::= 
+    term:t TIMES primary_expr:p     
+    {: RESULT = semanticAnalyzer.foldConstants(t, "*", p); :}
+    | term:t DIVIDE primary_expr:p   
+    {: RESULT = semanticAnalyzer.foldConstants(t, "/", p); :}
+    | term:t MOD primary_expr:p      
+    {: RESULT = semanticAnalyzer.foldConstants(t, "%", p); :}
+    | primary_expr:p                 
+    {: RESULT = p; :};
+
+primary_expr ::= 
+    LPAREN expr:e RPAREN    
+    {: RESULT = e; :}
+    | IDENTIFIER:id         
+    {: 
+        semanticAnalyzer.checkUndefinedVariable(id, ambitoActual, idleft);
+        Expression constValue = semanticAnalyzer.propagateConstants(id, ambitoActual);
+        RESULT = constValue != null ? constValue : new Expression(TipoDato.INT);
+    :}
+    | NUMBER:n              
+    {: RESULT = new Expression(TipoDato.INT, n); :}
+    | MINUS primary_expr:p  
+    {: RESULT = new Expression(TipoDato.INT); :} %prec UMINUS;
+
+logical_expr ::= 
+    rel_expr:r1 AND rel_expr:r2     {: RESULT = true; :}
+    | rel_expr:r1 OR rel_expr:r2    {: RESULT = true; :}
+    | NOT rel_expr:r                {: RESULT = true; :}
+    | rel_expr:r                    {: RESULT = r; :};
+
+rel_expr ::= 
+    arithmetic_expr:a1 EQUALS arithmetic_expr:a2    
+    {: 
+        semanticAnalyzer.checkTypeCompatibility(a1.getTipo(), a2.getTipo(), "==", a1left);
+        RESULT = true;
+    :}
+    | arithmetic_expr:a1 NOT_EQUALS arithmetic_expr:a2
+    | arithmetic_expr:a1 LT arithmetic_expr:a2
+    | arithmetic_expr:a1 GT arithmetic_expr:a2
+    | arithmetic_expr:a1 LTEQ arithmetic_expr:a2
+    | arithmetic_expr:a1 GTEQ arithmetic_expr:a2;
+
+if_statement ::=
+    IF LPAREN logical_expr:e RPAREN block:b
+    {: 
+        RESULT = new Instruccion(TipoInstruccion.IF, e.toString(), null, null, null, eleft);
+        instrucciones.add(RESULT);
+    :}
+    | IF LPAREN logical_expr:e RPAREN block:b1 ELSE block:b2
+    {: 
+        RESULT = new Instruccion(TipoInstruccion.IF_ELSE, e.toString(), null, null, null, eleft);
+        instrucciones.add(RESULT);
+    :};
+
+while_statement ::=
+    WHILE 
+    {: tablaSimbolos.enterLoop(); :}
+    LPAREN logical_expr:e RPAREN block:b
+    {: 
+        tablaSimbolos.exitLoop();
+        RESULT = new Instruccion(TipoInstruccion.WHILE, e.toString(), null, null, null, eleft);
+        instrucciones.add(RESULT);
+    :};
+
+block ::= 
+    LBRACE 
+    {: 
+        String prevAmbito = ambitoActual;
+        ambitoActual = ambitoActual + "_" + lbraceleft; 
+    :}
+    statement_list RBRACE
+    {: 
+        ambitoActual = prevAmbito;
+    :}
+    | LBRACE RBRACE;
+
+type ::= 
+    INT     {: RESULT = TipoDato.INT; :}
+    | CHAR  {: RESULT = TipoDato.CHAR; :}
+    | VOID  {: RESULT = null; :};
